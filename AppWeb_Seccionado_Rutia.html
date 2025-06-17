@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Generador de Geometrías para Cortes</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Roboto', sans-serif;
+      padding: 20px;
+      max-width: 800px;
+      margin: auto;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    input, button {
+      width: 100%;
+      padding: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: white;
+    }
+    input::placeholder {
+      color: #aaa;
+      font-style: italic;
+    }
+    label {
+      font-weight: bold;
+      margin-top: 10px;
+      display: block;
+    }
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0 4px;
+      margin-bottom: 6px;
+    }
+    th, td {
+      padding: 2px;
+      text-align: center;
+    }
+    td {
+      background-color: #f9f9f9;
+    }
+    button {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      margin-top: 8px;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    .acciones {
+      text-align: center;
+      margin-top: 15px;
+    }
+    .eliminar {
+      background-color: #a8e6a3 !important;
+      color: black;
+      font-weight: bold;
+    }
+    .eliminar:hover {
+      background-color: #92d28d !important;
+    }
+    #contador {
+      font-weight: bold;
+      text-align: right;
+      margin-top: 4px;
+    }
+    #mensaje-final {
+      margin-top: 16px;
+      text-align: center;
+      font-style: italic;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Generador de Geometrías para Cortes</h1>
+
+  <label>Nombre del proyecto</label>
+  <input id="proyecto" type="text" placeholder="Ej: Cocina Juan Paulier">
+
+  <label>Autor</label>
+  <input id="autor" type="text" placeholder="Ej: Juan Pérez">
+
+  <table id="tabla-piezas">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Ancho (mm)</th>
+        <th>Alto (mm)</th>
+        <th>Cantidad</th>
+        <th>Descripción</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div id="contador">Total de piezas: 0</div>
+
+  <div class="acciones">
+    <button onclick="agregarVariasFilas(5)">➕ Agregar piezas</button>
+    <button onclick="limpiarFormulario()">🧹 Limpiar todo</button>
+    <button onclick="exportarPDF()">⬇️ Descargar PDF</button>
+  </div>
+
+  <div id="mensaje-final">📎 Descargá el archivo y envialo por WhatsApp</div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script>
+    const tbody = document.querySelector('#tabla-piezas tbody');
+    const contadorEl = document.getElementById("contador");
+
+    function agregarFila(index, esPrimera = false) {
+      const fila = document.createElement('tr');
+      fila.innerHTML = `
+        <td>${index}</td>
+        <td><input type="number" class="ancho"></td>
+        <td><input type="number" class="alto"></td>
+        <td><input type="number" class="cantidad" value="0" min="0" onchange="actualizarContador()"></td>
+        <td><input type="text" class="nota" ${esPrimera ? 'placeholder="laterales aéreo"' : ''}></td>
+        <td><button class="eliminar" onclick="eliminarFila(this)">🗑️</button></td>
+      `;
+      tbody.appendChild(fila);
+      actualizarContador();
+    }
+
+    function agregarVariasFilas(n) {
+      const inicio = tbody.children.length + 1;
+      for (let i = 0; i < n; i++) {
+        agregarFila(inicio + i, i === 0 && inicio === 1);
+      }
+    }
+
+    function eliminarFila(btn) {
+      btn.parentElement.parentElement.remove();
+      actualizarNumeracion();
+      actualizarContador();
+    }
+
+    function limpiarFormulario() {
+      document.getElementById("proyecto").value = "";
+      document.getElementById("autor").value = "";
+      tbody.innerHTML = "";
+      agregarVariasFilas(12);
+    }
+
+    function actualizarNumeracion() {
+      [...tbody.children].forEach((tr, i) => {
+        tr.children[0].textContent = i + 1;
+      });
+    }
+
+    function actualizarContador() {
+      let total = 0;
+      document.querySelectorAll('#tabla-piezas tbody tr').forEach(tr => {
+        const ancho = +tr.querySelector('.ancho').value;
+        const alto = +tr.querySelector('.alto').value;
+        const cantidad = +tr.querySelector('.cantidad').value;
+        if (ancho > 0 && alto > 0 && cantidad > 0) total += cantidad;
+      });
+      contadorEl.textContent = `Total de piezas: ${total}`;
+    }
+
+    async function exportarPDF() {
+      const { jsPDF } = window.jspdf;
+      const proyecto = document.getElementById("proyecto").value || "proyecto";
+      const autor = document.getElementById("autor").value || "autor";
+      const fecha = new Date().toLocaleDateString();
+
+      const piezas = [];
+      document.querySelectorAll('#tabla-piezas tbody tr').forEach(tr => {
+        const ancho = +tr.querySelector('.ancho').value;
+        const alto = +tr.querySelector('.alto').value;
+        const cantidad = +tr.querySelector('.cantidad').value;
+        const nota = tr.querySelector('.nota').value;
+        if (ancho > 0 && alto > 0 && cantidad > 0) {
+          for (let i = 0; i < cantidad; i++) {
+            piezas.push({ ancho, alto, nota });
+          }
+        }
+      });
+
+      const escala = 0.05; // Escala 1:20
+      const doc = new jsPDF('l', 'mm', 'a4');
+
+      let page = 1;
+      let col = 0;
+      let row = 0;
+      const colWidth = 90;
+      const rowHeight = 70;
+      const colsPerPage = 3;
+      const rowsPerPage = 3;
+      const marginLeft = 10;
+      const marginTop = 35;
+
+      // Encabezado solo en la primera página
+      doc.setFontSize(12);
+      doc.text(`Cliente: ${autor}`, 10, 10);
+      doc.text(`Proyecto: ${proyecto}`, 10, 18);
+      doc.text(`Fecha: ${fecha}`, 10, 26);
+      doc.text(`Cantidad total de piezas: ${piezas.length}`, 10, 34);
+
+      piezas.forEach((p, i) => {
+        if (row >= rowsPerPage) {
+          doc.addPage();
+          row = 0;
+          col = 0;
+        }
+
+        const w = p.ancho * escala;
+        const h = p.alto * escala;
+        const x = marginLeft + col * colWidth;
+        const y = marginTop + row * rowHeight;
+
+        doc.setDrawColor(0);
+        doc.rect(x, y, w, h);
+        doc.setFontSize(8);
+        if (p.nota) doc.text(p.nota, x + 2, y + 6);
+        doc.text(`${p.ancho} x ${p.alto} mm`, x + 2, y + 11);
+
+        col++;
+        if (col >= colsPerPage) {
+          col = 0;
+          row++;
+        }
+      });
+
+      const nombreArchivo = `${autor.replace(/\s+/g, '_')}_${proyecto.replace(/\s+/g, '_')}.pdf`;
+      doc.save(nombreArchivo);
+    }
+
+    agregarVariasFilas(12);
+  </script>
+
+</body>
+</html>
